@@ -1,0 +1,16 @@
+# Requirements for the Pupil and PPG Data Processing, Feature Extraction, and Model Building Project
+
+# Core libraries
+numpy                 # Provides support for array operations and mathematical functions
+pandas                # Essential for data manipulation and analysis, specifically with dataframes
+matplotlib            # Used for data visualization, such as plotting data trends
+
+# Scientific and Machine Learning Libraries
+scipy                 # Used for interpolation and signal processing (savgol_filter, interp1d)
+scikit-learn          # Includes metrics, model selection, and preprocessing for machine learning
+
+# Deep Learning Library
+tensorflow            # Deep learning framework with Keras APIs for building neural networks
+
+# Colab-Specific Library (Optional)
+google-colab          # For integrating with Google Colab;
