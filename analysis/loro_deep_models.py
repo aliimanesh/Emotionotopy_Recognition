@@ -124,19 +124,21 @@ def main():
     ap.add_argument("--patience", type=int, default=30)
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--null-shifts", type=int, default=0, help="extra runs with circularly shifted labels (seed 0)")
-    ap.add_argument("--out", default="loro_results.csv")
+    ap.add_argument("--out", default=None, help="results CSV (default: one file per configuration)")
     args = ap.parse_args()
 
     d = load(args.data_dir, args.labels_file)
     y_true = d["labels"][args.targets].values.astype("float32")
     runs = np.unique(d["run"])
     config = f"{args.arch}|{args.inputs}|{'+'.join(args.targets)}"
+    if args.out is None:
+        args.out = f"loro_{args.arch}_{args.inputs}_{'-'.join(args.targets)}.csv".replace("+", "_")
     done = set()
     if os.path.exists(args.out):
         prev = pd.read_csv(args.out)
         done = set(zip(prev["config"], prev["label_set"], prev["seed"], prev["test_run"]))
 
-    jobs = [("true", s, y_true) for s in args.seeds]
+    jobs = [("real", s, y_true) for s in args.seeds]
     rng = np.random.default_rng(123)
     jobs += [(f"null{k}", 0, circular_shift(y_true, d["run"], d["window"], rng)) for k in range(args.null_shifts)]
 
@@ -158,7 +160,10 @@ def main():
             row = {"config": config, "label_set": label_set, "seed": seed, "test_run": test_run, "val_run": val_run,
                    "best_epoch": int(np.argmin(hist.history["val_loss"])) + 1, "minutes": (time.time() - t0) / 60,
                    **evaluate(y[te], pred, args.targets)}
-            pd.DataFrame([row]).to_csv(args.out, mode="a", header=not os.path.exists(args.out), index=False)
+            res = pd.DataFrame([row])
+            if os.path.exists(args.out):
+                res = pd.concat([pd.read_csv(args.out), res], ignore_index=True)
+            res.to_csv(args.out, index=False)
             print({k: (round(v, 3) if isinstance(v, float) else v) for k, v in row.items()}, flush=True)
 
     res = pd.read_csv(args.out)
