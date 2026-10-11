@@ -14,6 +14,9 @@ Single-task control:   --targets Complexity
 Two-target ablation:   --targets Polarity Intensity
 PPG only:              --inputs ppg
 Circular-shift null:   --null-shifts 5   (adds runs with time-shifted labels)
+
+Test-set predictions are saved next to the results CSV (<out>_predictions/)
+for analysis/loro_stats.py, which computes confidence intervals and p-values.
 """
 import argparse
 import os
@@ -43,6 +46,7 @@ def load(data_dir, labels_file):
         "labels": labels.loc[keep],
         "run": ppg.loc[keep, "Run_Number"].values,
         "window": movie_window.loc[keep].values,
+        "participant": ppg.loc[keep, "Participant_Number"].values,
     }
 
 
@@ -133,6 +137,8 @@ def main():
     config = f"{args.arch}|{args.inputs}|{'+'.join(args.targets)}"
     if args.out is None:
         args.out = f"loro_{args.arch}_{args.inputs}_{'-'.join(args.targets)}.csv".replace("+", "_")
+    pred_dir = os.path.splitext(args.out)[0] + "_predictions"
+    os.makedirs(pred_dir, exist_ok=True)
     done = set()
     if os.path.exists(args.out):
         prev = pd.read_csv(args.out)
@@ -157,6 +163,10 @@ def main():
                              epochs=args.max_epochs, batch_size=args.batch_size, verbose=0,
                              callbacks=[tf.keras.callbacks.EarlyStopping(patience=args.patience, restore_best_weights=True)])
             pred = model.predict([x[te] for x in X], verbose=0)
+            fold = pd.DataFrame({"participant": d["participant"][te], "run": d["run"][te], "window": d["window"][te]})
+            for i, t in enumerate(args.targets):
+                fold[f"y_{t}"], fold[f"pred_{t}"] = y[te][:, i], pred[:, i]
+            fold.to_csv(os.path.join(pred_dir, f"{label_set}_seed{seed}_run{test_run}.csv"), index=False)
             row = {"config": config, "label_set": label_set, "seed": seed, "test_run": test_run, "val_run": val_run,
                    "best_epoch": int(np.argmin(hist.history["val_loss"])) + 1, "minutes": (time.time() - t0) / 60,
                    **evaluate(y[te], pred, args.targets)}
